@@ -1,5 +1,5 @@
-package com.app.<YOUR_PACKAGE_NAME>;
- 
+package com.app.<YOUR_PACKAGE_NAME>; 
+
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
@@ -14,7 +14,7 @@ import java.util.Map;
 
 public class SimpleSqlite {
 
-    public static <T> ArrayList<T> get(SQLiteDatabase database, String query, Class<T> classOfT)
+    public static <T> ArrayList<T> getList(SQLiteDatabase database, String query, Class<T> classOfT)
     {
         ArrayList<T> list = new ArrayList<>();
         Cursor contentInfoCursor = database.rawQuery(query, null);
@@ -65,6 +65,59 @@ public class SimpleSqlite {
         }
 
         return list;
+    }
+
+    public static <T> T get(SQLiteDatabase database, String query, Class<T> classOfT)
+    {
+        Object dataObject=null;
+        Cursor contentInfoCursor = database.rawQuery(query, null);
+
+        try {
+            if (contentInfoCursor != null) {
+                if (contentInfoCursor.getCount()>0)
+                {
+                    contentInfoCursor.moveToFirst();
+
+                    String[] columnNames = contentInfoCursor.getColumnNames();
+
+                    //Check for inconsistencies
+                    checkSimpleSqliteInconsistencies(query,columnNames,classOfT);
+
+                    do
+                    {
+                        Map<String, Object> itemsMapList = new HashMap<>();
+
+                        for (int index=0; index<columnNames.length; index++)
+                        {
+                            int fieldType = contentInfoCursor.getType(contentInfoCursor.getColumnIndex(columnNames[index]));
+
+                            if (fieldType == Cursor.FIELD_TYPE_STRING)
+                                itemsMapList.put(columnNames[index],contentInfoCursor.getString(contentInfoCursor.getColumnIndex(columnNames[index])));
+                            else if (fieldType == Cursor.FIELD_TYPE_INTEGER)
+                                itemsMapList.put(columnNames[index],contentInfoCursor.getInt(contentInfoCursor.getColumnIndex(columnNames[index])));
+                            else if (fieldType == Cursor.FIELD_TYPE_FLOAT)
+                                itemsMapList.put(columnNames[index],contentInfoCursor.getFloat(contentInfoCursor.getColumnIndex(columnNames[index])));
+                            else if (fieldType == Cursor.FIELD_TYPE_BLOB)
+                                itemsMapList.put(columnNames[index],contentInfoCursor.getBlob(contentInfoCursor.getColumnIndex(columnNames[index])));
+                        }
+
+                        if (itemsMapList.size()>0)
+                        {
+                            dataObject = jsonToGenericObject(new JSONObject(itemsMapList).toString(),classOfT);
+                            break;
+                        }
+                    }
+                    while (contentInfoCursor.moveToNext());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        finally {
+            contentInfoCursor.close();
+        }
+
+        return (T)dataObject;
     }
 
     public static <T> void checkSimpleSqliteInconsistencies(String query, String[] columnNames, Class<T> classOfT)
